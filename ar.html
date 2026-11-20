@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+	<title>Dragón · Realidad aumentada</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link rel="icon" type="image/jpeg" href="assets/img/dragon.jpg">
+	<meta name="theme-color" content="#06122e">
+	<link rel="stylesheet" href="css/app.css">
+
+	<style>
+		/* ===== Pantalla de inicio ===== */
+		.dg-inicio {
+			position: fixed;
+			inset: 0;
+			z-index: 2000;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: safe center;
+			overflow-y: auto;
+			gap: 18px;
+			padding: 24px;
+			box-sizing: border-box;
+			text-align: center;
+			color: #fff;
+			font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+			background: radial-gradient(circle at 50% 30%, #123a8f 0%, #06122e 70%);
+			transition: opacity 0.4s ease;
+		}
+
+		.dg-inicio.oculto {
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		.dg-pill {
+			padding: 6px 14px;
+			border-radius: 999px;
+			border: 1px solid rgba(255, 255, 255, 0.35);
+			font-size: 12px;
+			letter-spacing: 0.08em;
+			text-transform: uppercase;
+		}
+
+		.dg-dragon {
+			width: min(52vw, 260px);
+			height: auto;
+			border-radius: 22px;
+			box-shadow: 0 10px 40px rgba(0, 120, 255, 0.45);
+		}
+
+		.dg-titulo {
+			margin: 0;
+			font-size: 28px;
+			font-weight: 800;
+		}
+
+		.dg-concepto {
+			margin: -6px 0 0;
+			max-width: 300px;
+			font-size: 13px;
+			font-style: italic;
+			line-height: 1.45;
+			letter-spacing: 0.02em;
+			color: #9fc2ff;
+		}
+
+		.dg-texto {
+			margin: 0;
+			max-width: 320px;
+			font-size: 15px;
+			line-height: 1.4;
+			color: #cfe0ff;
+		}
+
+		.dg-boton {
+			min-width: 220px;
+			padding: 15px 28px;
+			border: 0;
+			border-radius: 999px;
+			font: inherit;
+			font-size: 18px;
+			font-weight: 700;
+			color: #06122e;
+			background: #fff;
+			cursor: pointer;
+		}
+
+		.dg-boton:disabled {
+			opacity: 0.6;
+			cursor: default;
+		}
+
+		.dg-carga {
+			display: none;
+			width: min(70vw, 280px);
+			flex-direction: column;
+			gap: 8px;
+			align-items: center;
+		}
+
+		.dg-inicio.cargando .dg-carga { display: flex; }
+		.dg-inicio.cargando .dg-boton { display: none; }
+
+		.dg-barra {
+			width: 100%;
+			height: 10px;
+			border-radius: 999px;
+			background: rgba(255, 255, 255, 0.2);
+			overflow: hidden;
+		}
+
+		.dg-barra-fill {
+			height: 100%;
+			width: 0;
+			border-radius: 999px;
+			background: #fff;
+			transition: width 0.25s ease;
+		}
+
+		.dg-estado { font-size: 13px; color: #cfe0ff; }
+
+		.dg-error {
+			display: none;
+			margin: 0;
+			max-width: 300px;
+			font-size: 14px;
+			color: #ffb4b4;
+		}
+
+		.dg-error.visible { display: block; }
+
+		/* ===== Botón de información (esquina superior derecha) y ventana ===== */
+		.dg-info-btn {
+			position: fixed;
+			top: max(14px, env(safe-area-inset-top));
+			right: max(14px, env(safe-area-inset-right));
+			z-index: 1500;
+			width: 44px;
+			height: 44px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border: 1.5px solid rgba(255, 255, 255, 0.6);
+			border-radius: 50%;
+			background: rgba(6, 18, 46, 0.65);
+			-webkit-backdrop-filter: blur(6px);
+			backdrop-filter: blur(6px);
+			color: #fff;
+			font-family: Georgia, 'Times New Roman', serif;
+			font-size: 22px;
+			font-style: italic;
+			font-weight: 700;
+			cursor: pointer;
+			padding: 0;
+		}
+
+		.dg-modal {
+			position: fixed;
+			inset: 0;
+			z-index: 3000;
+			display: none;
+			align-items: center;
+			justify-content: center;
+			padding: 18px;
+			box-sizing: border-box;
+			background: rgba(3, 10, 30, 0.65);
+			-webkit-backdrop-filter: blur(4px);
+			backdrop-filter: blur(4px);
+		}
+
+		.dg-modal.abierto {
+			display: flex;
+			animation: dg-fade 0.22s ease;
+		}
+
+		@keyframes dg-fade {
+			from { opacity: 0; }
+			to { opacity: 1; }
+		}
+
+		.dg-modal-card {
+			position: relative;
+			width: 100%;
+			max-width: 420px;
+			max-height: 86vh;
+			overflow-y: auto;
+			box-sizing: border-box;
+			padding: 34px 26px 28px;
+			border: 2px solid #5b8cff;
+			border-radius: 24px;
+			background: linear-gradient(180deg, #0e2a6b 0%, #06122e 100%);
+			color: #fff;
+			font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+			box-shadow: 0 12px 50px rgba(0, 90, 255, 0.35);
+		}
+
+		.dg-modal-card h2 {
+			margin: 0 0 14px;
+			font-size: 22px;
+			font-weight: 800;
+		}
+
+		.dg-modal-card p {
+			margin: 0 0 12px;
+			font-size: 14.5px;
+			line-height: 1.55;
+			color: #dbe7ff;
+		}
+
+		.dg-modal-card p:last-child { margin-bottom: 0; }
+
+		.dg-modal-cerrar {
+			position: absolute;
+			top: 10px;
+			right: 12px;
+			width: 36px;
+			height: 36px;
+			border: 0;
+			border-radius: 50%;
+			background: rgba(255, 255, 255, 0.14);
+			color: #fff;
+			font-size: 22px;
+			line-height: 1;
+			cursor: pointer;
+		}
+	</style>
+
+	<script type="importmap">
+	{
+		"imports": {
+			"three": "./js/three.compat.js",
+			"three/addons/": "./js/addons/",
+			"mindar-image-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-three.prod.js"
+		}
+	}
+	</script>
+
+	<script type="module">
+		import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/loaders/GLTFLoader.js';
+		window.ThreeGLTFLoader = GLTFLoader;
+	</script>
+</head>
+
+<body ontouchstart="">
+
+	<div id="ar-container"></div>
+
+	<div class="log" id="log"></div>
+
+	<!-- Botón de información: abre la ventana con la explicación del proyecto -->
+	<button type="button" class="dg-info-btn" id="dg-info-btn" aria-label="Sobre la propuesta">i</button>
+
+	<div class="dg-modal" id="dg-modal" role="dialog" aria-modal="true" aria-labelledby="dg-modal-titulo">
+		<div class="dg-modal-card">
+			<button type="button" class="dg-modal-cerrar" id="dg-modal-cerrar" aria-label="Cerrar">&times;</button>
+			<h2 id="dg-modal-titulo">Sobre la propuesta</h2>
+			<p>Elegí la porcelana de la dinastía Ming porque es una de las manifestaciones artísticas más representativas de la cultura china y porque me llamó la atención cómo logra integrar la pintura, la cerámica y el simbolismo cultural en una misma pieza.</p>
+			<p>Además de su valor estético, la porcelana Ming tuvo una gran relevancia en la historia del arte por el perfeccionamiento de sus técnicas y su influencia en la producción artística de otras culturas.</p>
+			<p>Para mi propuesta decidí conservar dos de sus características más representativas: el contraste entre el blanco y el azul cobalto, y la figura del dragón como símbolo de poder y autoridad imperial.</p>
+			<p>Mi intención no fue realizar una reproducción exacta de una pieza histórica, sino reinterpretar esta manifestación artística desde el diseño digital, incorporando la realidad aumentada como una herramienta que permite darle movimiento a la ilustración y generar una conexión entre el arte tradicional y la tecnología contemporánea.</p>
+			<p>De esta manera, el espectador no solamente contempla la pieza, sino que también experimenta una nueva forma de relacionarse con ella.</p>
+		</div>
+	</div>
+
+	<!-- Pantalla de inicio -->
+	<div id="dg-inicio" class="dg-inicio">
+		<div class="dg-pill">Experiencia de realidad aumentada</div>
+		<img class="dg-dragon" src="assets/img/dragon.jpg" alt="Dragón azul">
+		<h1 class="dg-titulo">Despierta al dragón</h1>
+		<p class="dg-concepto">Reinterpretación de la porcelana china de la dinastía Ming mediante la realidad aumentada.</p>
+		<p class="dg-texto">Apunta la cámara al sticker del dragón y míralo cobrar vida.</p>
+
+		<button type="button" id="dg-start" class="dg-boton">
+			<span id="dg-start-label">Empezar</span>
+		</button>
+
+		<div class="dg-carga" aria-live="polite">
+			<div class="dg-barra" id="dg-barra" role="progressbar" aria-label="Progreso de carga" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+				<div class="dg-barra-fill" id="dg-barra-fill"></div>
+			</div>
+			<div class="dg-estado" id="dg-estado">Cargando...</div>
+			<p class="dg-texto">Cuando tu dispositivo lo pida, toca “Permitir” para usar la cámara.</p>
+		</div>
+
+		<p id="dg-error" class="dg-error" role="alert"></p>
+	</div>
+
+	<script type="module">
+
+		import * as THREE from './js/three.module.js';
+		import { APP } from './js/app.js';
+		import { MindARController } from './js/mindar/mindar_controller.js';
+
+		window.THREE = THREE; // Used by APP Scripts.
+
+		const log = document.getElementById('log');
+		const overlay = document.getElementById('dg-inicio');
+		const startButton = document.getElementById('dg-start');
+		const startLabel = document.getElementById('dg-start-label');
+		const errorMsg = document.getElementById('dg-error');
+		const arContainer = document.getElementById('ar-container');
+		const progressFill = document.getElementById('dg-barra-fill');
+		const progressBar = document.getElementById('dg-barra');
+		const progressLabel = document.getElementById('dg-estado');
+
+
+		// Botón de información: abre y cierra la ventana
+		const infoBtn = document.getElementById('dg-info-btn');
+		const infoModal = document.getElementById('dg-modal');
+		const abrirInfo = () => infoModal.classList.add('abierto');
+		const cerrarInfo = () => infoModal.classList.remove('abierto');
+		infoBtn.addEventListener('click', abrirInfo);
+		document.getElementById('dg-modal-cerrar').addEventListener('click', cerrarInfo);
+		infoModal.addEventListener('click', (e) => { if (e.target === infoModal) cerrarInfo(); });
+		document.addEventListener('keydown', (e) => { if (e.key === 'Escape') cerrarInfo(); });
+
+		const debugMode = new URLSearchParams(location.search).get('debug') === '1';
+		if (!debugMode) log.style.display = 'none';
+
+		let player = null;
+		let mindarController = null;
+		let loaded = false;
+		let loadPromise = null;
+
+		function setProgress(percent, text) {
+			progressFill.style.width = `${percent}%`;
+			progressBar.setAttribute('aria-valuenow', percent);
+			if (text) progressLabel.textContent = text;
+		}
+
+		async function loadEverything() {
+
+			if (loadPromise) return loadPromise;
+
+			loadPromise = (async () => {
+
+				setProgress(0, 'Cargando escena...');
+
+				const text = await new Promise((resolve, reject) => {
+					const loader = new THREE.FileLoader();
+					loader.load(
+						'app.json',
+						(t) => resolve(t),
+						(e) => {
+							if (e.lengthComputable) {
+								const p = Math.round((e.loaded / e.total) * 25);
+								setProgress(p, 'Cargando escena...');
+							}
+						},
+						(err) => reject(new Error(err.statusText || 'No se pudo descargar el json'))
+					);
+				});
+
+				player = new APP.Player({ alpha: true });
+				await player.load(JSON.parse(text));
+				player.setSize(window.innerWidth, window.innerHeight);
+				player.play();
+				setProgress(55, 'Escena lista...');
+
+				document.body.appendChild(player.dom);
+
+				window.addEventListener('resize', function () {
+					player.setSize(window.innerWidth, window.innerHeight);
+				});
+
+				window.player = player;
+
+				setProgress(85, 'Preparando AR...');
+				log.textContent = 'initializing...';
+
+				await new Promise((resolve) => setTimeout(resolve, 10));
+
+				setProgress(100, 'Listo');
+				loaded = true;
+
+			})().catch((e) => {
+				loaded = false;
+				loadPromise = null;
+				throw e;
+			});
+
+			return loadPromise;
+		}
+
+		startButton.addEventListener('click', async () => {
+
+			errorMsg.classList.remove('visible');
+			startButton.disabled = true;
+			overlay.classList.add('cargando');
+
+			try {
+				await loadEverything();
+				if (!loaded) return;
+
+				setProgress(90, 'Iniciando cámara...');
+
+				mindarController = new MindARController(arContainer, player, debugMode);
+				window.mindarController = mindarController;
+
+				await mindarController.start();
+
+				if (player?.dom) player.dom.style.display = 'none';
+
+				overlay.classList.add('oculto');
+				setTimeout(() => overlay.remove(), 400);
+			} catch (e) {
+				console.error('Error durante la carga:', e);
+				overlay.classList.remove('cargando');
+				startButton.disabled = false;
+				startLabel.textContent = 'Reintentar';
+				errorMsg.textContent = 'No pudimos iniciar la experiencia. Revisa los permisos de la cámara y vuelve a intentar.';
+				errorMsg.classList.add('visible');
+				setProgress(0, 'Error al iniciar');
+			}
+
+		});
+
+		loadEverything().catch((e) => {
+			console.error('Error durante la carga automática:', e.message);
+			startLabel.textContent = 'Reintentar';
+			errorMsg.textContent = 'No se pudo cargar la experiencia. Revisa tu conexión y vuelve a intentar.';
+			errorMsg.classList.add('visible');
+			setProgress(0, 'Error al cargar');
+		});
+
+	</script>
+</body>
+
+</html>
