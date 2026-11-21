@@ -1,11 +1,16 @@
 import * as THREE from 'three';
 import { MindARThree } from 'mindar-image-three';
 
-// Medidas en "unidades de sticker": 1 unidad = el ancho del sticker pegado en el jarrón.
-// El eje de arriba del sticker es el de arriba del jarrón.
-const STICKER_PX_ANCHO = 1008;            // medidas de la imagen del sticker con la que se generó targets.mind
-const STICKER_PX_ALTO = 1600;
-const ALTO_STICKER = STICKER_PX_ALTO / STICKER_PX_ANCHO; // alto del sticker en unidades (su ancho = 1)
+// El marcador (targets.mind) es la foto del florero completo con el dragón pegado.
+const MARCADOR_PX_ANCHO = 1087;           // medidas de la imagen con la que se generó targets.mind
+const MARCADOR_PX_ALTO = 1447;
+const ALTO_MARCADOR = MARCADOR_PX_ALTO / MARCADOR_PX_ANCHO; // alto del marcador (su ancho = 1)
+
+// Todo lo de abajo (video, nubes, neblina, ojos, halo) está medido en "unidades de sticker": 1 unidad = el ancho del sticker del dragón.
+// Estas tres medidas lo acomodan sobre el marcador del florero.
+const ESCALA_CONTENIDO = 0.55;            // cuánto mide 1 unidad de sticker en el marcador. Súbela para que TODO (dragón, nubes, neblina) salga más grande
+const CONTENIDO_X = -0.013;               // dónde queda el centro del dragón del sticker, en el marcador (x: izquierda -, derecha +)
+const CONTENIDO_Y = 0.088;                // (y: arriba +). 0 = centro de la foto del florero
 const ANCHO_VIDEO = 1.4;                  // ancho del video del dragón. Súbelo para un dragón más grande
 const ALTO_VIDEO = ANCHO_VIDEO * 1280 / 720; // el video mide 720 x 1280, así no se deforma
 const SUBIR = -0.2;                       // dónde queda el borde de abajo del video. 0 = en el centro del sticker, 0.75 = en el borde de arriba del sticker, 1.05 = más o menos en la boca del jarrón, -0.75 = en el borde de abajo
@@ -54,15 +59,12 @@ const BRUMA = [
     { x: 0.20,  y: 2.80, ancho: 2.6, alto: 1.1, op: 0.60, atras: true, vel: 0.26, deriva: 0.12 },
 ];
 
-// Ojos del dragón del sticker. Posición en píxeles de la imagen del sticker (1008 x 1600). tam = tamaño del brillo en unidades de sticker.
-const OJOS_STICKER = [
-    { x: 384, y: 384, tam: 0.12 },  // ojo grande
-    { x: 329, y: 378, tam: 0.065 }, // ojo pequeño
-];
+// Ojos del dragón del sticker. Posición en píxeles de la imagen del marcador (1087 x 1447). tam = tamaño del brillo en unidades de sticker.
+const OJOS_STICKER = []; // vacío = sin brillo en los ojos del sticker. Para volver a encenderlos, agrega aquí { x: 451, y: 400, tam: 0.12 } y { x: 412, y: 398, tam: 0.065 }
 const COLOR_OJOS_STICKER = 0x7fe3ff;   // celeste claro
 const INTENSIDAD_OJOS_STICKER = 0.9;   // 0 a 1
 
-// Halo de luz que bordea al dragón del sticker (imagen assets/img/halo-dragon.png, calzada con el sticker)
+// Halo de luz que bordea al dragón del sticker (imagen assets/img/halo-dragon.png, del mismo tamaño y proporción que el marcador)
 const COLOR_HALO = 0x9fd8ff;       // celeste muy claro
 const INTENSIDAD_HALO = 0.9;       // 0 a 1. Más bajo = más sutil
 
@@ -90,7 +92,7 @@ class MindARController {
         this.debug = debug;
         this.isMobile = /Android|iPhone|iPod|iPad/i.test(navigator.userAgent);
 
-        // Archivo compilado a partir de la imagen del sticker
+        // Archivo compilado a partir de la foto del florero
         this.imageTargetSrc = 'assets/marker/targets.mind';
 
         this.mindar = null;
@@ -132,7 +134,7 @@ class MindARController {
             container: this.container,
             imageTargetSrc: this.imageTargetSrc,
             filterMinCF: 0.00005,
-            filterBeta: 20,
+            filterBeta: 5,
             warmupTolerance: 3,
             missTolerance: 12,
             uiLoading: 'no',
@@ -151,7 +153,11 @@ class MindARController {
 
         // El contenido cuelga de este nodo y no directo del marcador.
         // Cada cuadro seguimos al marcador con amortiguación para quitar el temblor.
-        const SUAVIDAD = 0.08; // segundos: más alto = más suave pero más lento
+        // La suavidad se adapta: si el marcador casi no se mueve, el dragón se queda quieto (quita el temblor);
+        // si de verdad mueves el celular, lo sigue rápido.
+        const SUAVIDAD_QUIETO = 0.55; // segundos: más alto = más firme cuando todo está quieto
+        const SUAVIDAD_MOVIMIENTO = 0.07; // segundos: más bajo = más rápido al mover el celular
+        const UMBRAL_MOVIMIENTO = 0.03; // cuánto cambio (en unidades de marcador) cuenta como movimiento real
         const suavizado = new THREE.Group();
         scene.add(suavizado);
         let primera = true;
@@ -163,9 +169,9 @@ class MindARController {
         let planoDragon = null; // el plano del video, para esconderlo mientras el dragón "despierta"
         if (content) {
             // El plano del video se pone justo encima del sticker, sin las transformaciones del editor
-            content.position.set(0, 0, 0);
+            content.position.set(CONTENIDO_X, CONTENIDO_Y, 0);
             content.rotation.set(0, 0, 0);
-            content.scale.set(1, 1, 1);
+            content.scale.setScalar(ESCALA_CONTENIDO);
 
             // Busca el plano del video por nombre ("Dragon" o "video Dragon")
             let dragon = null;
@@ -185,7 +191,7 @@ class MindARController {
             this.crearNubes(content);
             this.crearBruma(content);
             this.crearOjos(content);
-            this.crearHalo(content);
+            // this.crearHalo(content); // halo del dragón del sticker: desactivado
             this.ajustarVelocidad(player);
 
             content.visible = false;
@@ -265,7 +271,11 @@ class MindARController {
                     suavizado.scale.copy(escObj);
                     primera = false;
                 } else {
-                    const k = 1 - Math.exp(-dt / SUAVIDAD);
+                    const mov = posObj.distanceTo(suavizado.position) / UMBRAL_MOVIMIENTO
+                        + quatObj.angleTo(suavizado.quaternion) / (UMBRAL_MOVIMIENTO * 2.5);
+                    const t = Math.min(1, mov * mov);
+                    const tau = SUAVIDAD_QUIETO + (SUAVIDAD_MOVIMIENTO - SUAVIDAD_QUIETO) * t;
+                    const k = 1 - Math.exp(-dt / tau);
                     suavizado.position.lerp(posObj, k);
                     suavizado.quaternion.slerp(quatObj, k);
                     suavizado.scale.lerp(escObj, k);
@@ -461,12 +471,20 @@ class MindARController {
         // Ojos del sticker: van debajo del video del dragón
         this.ojosSticker = OJOS_STICKER.map((o) => {
             const g = crear(COLOR_OJOS_STICKER, o.tam, 0.5);
-            g.mesh.position.set(o.x / STICKER_PX_ANCHO - 0.5, (0.5 - o.y / STICKER_PX_ALTO) * ALTO_STICKER, 0.005);
+            const p = this.pxAContenido(o.x, o.y);
+            g.mesh.position.set(p[0], p[1], 0.005);
             return g;
         });
 
         // Ojos del dragón del video: van encima de todo
         this.ojosRugido = [crear(0xffffff, TAM_OJOS_RUGIDO, 5), crear(0xffffff, TAM_OJOS_RUGIDO, 5)];
+    }
+
+    // Pasa un punto de la imagen del marcador (en píxeles) a las coordenadas del contenido (unidades de sticker)
+    pxAContenido(px, py) {
+        const u = px / MARCADOR_PX_ANCHO - 0.5;
+        const v = (0.5 - py / MARCADOR_PX_ALTO) * ALTO_MARCADOR;
+        return [(u - CONTENIDO_X) / ESCALA_CONTENIDO, (v - CONTENIDO_Y) / ESCALA_CONTENIDO];
     }
 
     animarOjos(t) {
@@ -514,7 +532,7 @@ class MindARController {
         }
     }
 
-    // Halo fino de luz que bordea al dragón del sticker. Es una imagen del mismo tamaño que el sticker
+    // Halo fino de luz que bordea al dragón del sticker. Es una imagen del mismo tamaño que el marcador
     crearHalo(content) {
         const material = new THREE.MeshBasicMaterial({
             color: COLOR_HALO,
@@ -525,8 +543,8 @@ class MindARController {
             depthWrite: false,
             toneMapped: false,
         });
-        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, ALTO_STICKER), material);
-        mesh.position.set(0, 0, 0.003);
+        const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1 / ESCALA_CONTENIDO, ALTO_MARCADOR / ESCALA_CONTENIDO), material);
+        mesh.position.set(-CONTENIDO_X / ESCALA_CONTENIDO, -CONTENIDO_Y / ESCALA_CONTENIDO, 0.003);
         mesh.renderOrder = 0.4; // debajo del video del dragón
         content.add(mesh);
         this.halo = { mesh, material };
@@ -600,7 +618,7 @@ class MindARController {
 
     // Con ?debug=1 se ve un recuadro azul sobre el sticker para comprobar que lo detecta bien
     addMarkerDebugHelpers(root) {
-        const planeGeometry = new THREE.PlaneGeometry(1, ALTO_STICKER, 1, 1);
+        const planeGeometry = new THREE.PlaneGeometry(1, ALTO_MARCADOR, 1, 1);
         const planeMaterial = new THREE.MeshBasicMaterial({
             color: 0x00ffff,
             transparent: true,
